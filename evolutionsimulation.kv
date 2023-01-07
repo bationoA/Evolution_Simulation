@@ -3,8 +3,7 @@ MainInterface:
 #:set nb_rows 60
 #:set nb_cols 100
 #:set gen_label_width_size .1
-#:set menu_start_button_width .05
-#:set menu_button_Predefined_initial_state_width .12
+#:set menu_start_button_width .04
 <MainInterface>:
     orientation: 'vertical'
     padding: 0
@@ -22,37 +21,62 @@ MainInterface:
                 rgba: 0, 0, 0 , .5
             Rectangle:
                 size: self.size
+
+        Button:
+            id: id_button_reset_grid
+            # text: 'R'
+            background_normal: id_HorizontalMenuLayout.reset_btn_logo
+            # background_color: (1, 1, 1, 1)
+            size_hint: (menu_start_button_width*.7, .85)
+            # size: self.texture_size
+            pos_hint: {'center_x': 0.02}
+            on_press: id_SimulationBoxLayout.reset_grid()
+
         Label:
             id: gen_label_id_HorizontalMenuLayout
-            text: self.parent.gen_label
+            text: id_SimulationBoxLayout.generation
             halign: 'left'
             valign: 'top'
             size_hint:(gen_label_width_size, .8)
             pos_hint: {"x": -gen_label_width_size/2+.1, "y": 0.1}
 
         Button:
-            text: 'Start'
-            background_color: (1, 1, 1, 1)#'resources/images/button-1.png'
-            size_hint: (menu_start_button_width, 1)
+            id: id_restart_button
+            # text: 'Restart'
+            background_normal: id_HorizontalMenuLayout.restart_btn_logo
+            background_color: (1, 1, 1, 1)
+            size_hint: (menu_start_button_width, .9)
             size: self.texture_size
-            pos_hint: {'center_x': 0.5}
-            on_press: id_HorizontalMenuLayout.start_simulation()
+            pos_hint: {'center_x': 0.4}
+            # on_press: id_SimulationBoxLayout.start_simulation()
 
         Button:
-            id: id_button_mark
-            text: 'Mark'
+            id: id_start_button
+            # text: 'Start'
+            background_normal: id_HorizontalMenuLayout.start_btn_logo
             background_color: (1, 1, 1, 1)
-            size_hint: (menu_button_Predefined_initial_state_width/2, 1)
+            size_hint: (menu_start_button_width, .9)
             size: self.texture_size
-            pos_hint: {'center_x': 1-2*menu_button_Predefined_initial_state_width}
+            pos_hint: {'center_x': 0.5}
+            # on_press: id_SimulationBoxLayout.start_simulation()
+
+        Button:
+            id: id_button_save
+            # text: 'Mark'
+            background_normal: id_HorizontalMenuLayout.save_btn_logo
+            background_color: (1, 1, 1, 1)
+            size_hint: (menu_start_button_width*.6, .6)
+            size: self.texture_size
+            pos_hint: {'center_x': .9}
 
         Button:
             id: id_button_Predefined_initial_state
-            text: 'Predefined initial state'
+            text: 'Bookmarks'
+            background_normal: id_HorizontalMenuLayout.predefined_btn_logo
             background_color: (1, 1, 1, 1)
-            size_hint: (menu_button_Predefined_initial_state_width, 1)
+            size_hint: (menu_start_button_width*1.8, .7)
             size: self.texture_size
-            pos_hint: {'center_x': 1-menu_button_Predefined_initial_state_width/2}
+            pos_hint: {'center_x': 1-menu_start_button_width*.9}
 
 
     GridZoneLayout:
@@ -62,8 +86,8 @@ MainInterface:
           #      rgba: 1, 1, 1, 1
            # Rectangle:
             #    size: self.size
-        SimulationGridLayout:
-            id: id_SimulationGridLayout
+        SimulationBoxLayout:
+            id: id_SimulationBoxLayout
             size_hint: (1, 1)
 
 

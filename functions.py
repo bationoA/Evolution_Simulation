@@ -1,12 +1,14 @@
 import json
 import random
+from typing import List
+
+import numpy as np
 
 from kivy.config import Config
 from kivy.properties import StringProperty
 from kivy.uix.dropdown import DropDown
 
 Config.set('graphics', 'resizable', '0')
-from kivy.core.window import Window
 import time
 
 import schedule
@@ -20,17 +22,11 @@ from kivy.uix.stacklayout import StackLayout
 from kivy.uix.relativelayout import RelativeLayout
 from kivy.uix.widget import Widget
 from kivy.core.window import Window
+from config import *
 
-window_width = 1480
-window_height = 800
 Window.size = (window_width, window_height)
 Window.minimum_width, Window.minimum_height = Window.size
-Window.clearcolor = (.1, .1, .1, 1)
-
-HorizontalMenuLayout_height_proportion = .07
-HorizontalMenuLayout_width_proportion = 1
-GridZoneLayout_height_proportion = 1 - HorizontalMenuLayout_height_proportion
-GridZoneLayout_width_proportion = 1
+Window.clearcolor = window_background_color
 
 
 # Create a custom widget to hold the grid
@@ -49,21 +45,25 @@ def save_initial_sate(active_cells_coord: list):
 
 
 class HorizontalMenuLayout(RelativeLayout):
-    gen_label = StringProperty('Gen')
+    start_btn_logo = StringProperty()
+    restart_btn_logo = StringProperty()
+    reset_btn_logo = StringProperty()
+    save_btn_logo = StringProperty()
+    predefined_btn_logo = StringProperty()
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.start_btn_logo = start_button_logo_name
+        self.restart_btn_logo = restart_button_logo_name
+        self.reset_btn_logo = reset_button_logo_name
+        self.save_btn_logo = save_button_logo_name
+        self.predefined_btn_logo = predefined_button_logo_name
         self.dropdown_button = None
-        self.gen_label = "Gen: "
 
     def on_kv_post(self, *args):
         # Get the main button to open the dropdown menu
         self.dropdown_button = self.parent.ids.id_button_Predefined_initial_state
-
         self.right_dopdown_menu()
-
-    def start_simulation(self):
-        print("start_simulation")
 
     def right_dopdown_menu(self):
         dropdown = DropDown()
@@ -79,33 +79,6 @@ class HorizontalMenuLayout(RelativeLayout):
         self.dropdown_button.bind(on_release=dropdown.open)
 
 
-# Define a custom button class with a background color property
-class CellRectangle(Widget):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self._color = (0, 0, 0, 0)  # Transparent to let visible a white background
-        self._size = (200, 200)
-        self._position = (0, 0)
-        self.is_active = False
-        # Create a widget to hold the rectangle
-        self.rectangle_widget = Widget()
-        with self.rectangle_widget.canvas:
-            # Create the rectangle object
-            self.rectangle = Rectangle(size=(200, 300), color=(1, 0, 1, 1))
-        self.bind(on_press=self.on_press)
-        self.add_widget(self.rectangle_widget)  # Add the rectangle_widget widget to the CellRectangle class
-
-    def on_press(self):
-        print('on_press')
-        # Change the background color of the clicked cell
-        if self.is_active:
-            self.rectangle.color = (0, 0, 0, 0)  # transparent
-            self.is_active = False
-        else:
-            self.rectangle.color = (0, 0, 0, 1)  # black
-            self.is_active = True
-
-
 class GridZoneLayout(BoxLayout):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -114,9 +87,16 @@ class GridZoneLayout(BoxLayout):
 
 
 # Define a custom grid layout class with a method to change the background color of a cell
-class SimulationGridLayout(BoxLayout):
+def remove_duplicates_rect(rect_list: List[Rectangle]) -> list:
+    return list(set(rect_list))
+
+
+class SimulationBoxLayout(BoxLayout):
+    generation = StringProperty()
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.start_button = None
         self.rect_width_size = None
         self.rect_height_size = None
         self.nb_rows = 50
@@ -124,13 +104,23 @@ class SimulationGridLayout(BoxLayout):
         self.horizontal_lines_coords = []
         self.vertical_lines_coords = []
         self.rectangles_list_in_canvas = []
-        self.active_rectangle_pos_list = []
+        self.active_rectangles_list = []
         self.all_rectangles_list = []
-        self.rectangles_with_next_new_state = []  # [dict(next_state: activate|deactivate, rect: Rectangle)]
+        self.rectangles_to_be_active_in_next_generation = []
+        self.rectangles_to_deactivate_in_next_generation = []
+        self.generation_default = "GEN:"
+        self.generation = self.generation_default
+        self.generation_number = 0
+        self.in_simulation = False
+        self.run_interval_seconds = run_interval_seconds
 
     def on_kv_post(self, *args):
         # When Layouts are rendered then...
+        # Get starting button
+        self.start_button = self.parent.parent.ids.id_start_button
+
         self.size = self.parent.size
+        # Generate grid
         self.generate_grid()
 
     def init_vertical_line(self, x0: float, y1: float, y0=0):
@@ -149,117 +139,23 @@ class SimulationGridLayout(BoxLayout):
         with self.canvas:
             # Color(random.choice([0, 1]), random.choice([0, 1]), random.choice([0, 1]), 1)
             Color(1, 1, 1, 1)
-            rect = Rectangle(pos=(x, y), size=(w, h), color=(1, 1, 1, 1))
-            self.rectangles_list_in_canvas.append(rect)
-            if rect in self.active_rectangle_pos_list:
-                self.active_rectangle_pos_list.remove(rect)  # Then activate the corresponding cell
-                # by removing it (to have a black cell)
+            new_rect = Rectangle(pos=(x, y), size=(w, h), color=(1, 1, 1, 1))
+            self.rectangles_list_in_canvas.append(new_rect)
+            # Replace the old rectangle in all_rectangles_list by the new one
+            existing_rect = self.get_rect_from_list(obj=new_rect, rect_list=self.all_rectangles_list)
+            if existing_rect is not None:
+                self.all_rectangles_list.remove(existing_rect)
+                self.all_rectangles_list.append(new_rect)
 
-    def get_pressed_rectangle(self, press_x: float, press_y: float):
-        pressed_rect = [rect for rect in self.rectangles_list_in_canvas if rect.pos[0] <= press_x <= rect.pos[
-            0] + self.rect_width_size and rect.pos[1] <= press_y <= rect.pos[1] + self.rect_height_size]
-
-        if pressed_rect:
-            return pressed_rect[0]
-        else:
-            return None
-
-    def activate_rect(self, rect: Rectangle):
-        self.canvas.remove(rect)  # activate
-        self.rectangles_list_in_canvas.remove(rect)
-        self.active_rectangle_pos_list.append(rect)
-
-    def deactivate_rect(self, rect: Rectangle):
-        with self.canvas:
-            # Color((1, 1, 1, 0))
-            self.init_rectangle(x=rect.pos[0], y=rect.pos[1],
-                                w=self.rect_width_size, h=self.rect_height_size)
-
-    def get_rectangle_from_removed_list(self, press_x: float, press_y: float):
-        rmd_rect = [rect for rect in self.active_rectangle_pos_list if rect.pos[0] <= press_x <= rect.pos[
-            0] + self.rect_width_size and rect.pos[1] <= press_y <= rect.pos[1] + self.rect_height_size]
-
-        if rmd_rect:
-            return rmd_rect[0]
-        else:
-            return None
-
-    def is_touch_inside_current_layout(self, touch) -> bool:
-        return touch.y <= self.height
-
-    def on_touch_down(self, touch):
-        if self.is_touch_inside_current_layout(touch):
-            rect = self.get_pressed_rectangle(press_x=touch.x, press_y=touch.y)
-
-            if rect is not None:
-                # print(f"Found rectangle with position: {rect.pos}")
-                self.activate_rect(rect=rect)
-            else:
-                # print(f"Not found rectangle with position")
-                rect = self.get_rectangle_from_removed_list(press_x=touch.x, press_y=touch.y)
-                # print(f"Found removed rectangle with position: {rect.pos}")
-                if rect is not None:
-                    self.deactivate_rect(rect=rect)
-                else:
-                    print("Error: No rectangle found")
-
-            if rect is not None:
-                self.canvas.ask_update()
-
-    def get_surrounding_cells_list(self, rect: Rectangle) -> [Rectangle]:
-        """
-        This function returns the list of all rectangles touching the rectangle given in argument 'rect'
-        :param rect:
-        :return:
-        """
-        tl = 1 / 1000000
-        rect_list = [Rectangle]
-        rect_x, rect_y = rect.pos
-
-        # 1  2  3
-        # 4  r  6
-        # 7  8  9
-        # r is the rectangle of interest
-        # Each rectangle is surrounded by at most 8 others rectangles
-        # We start by the bottom left rectangle, progress left to right, down to up, and finish by the top right
-        start_x = rect_x - self.rect_width_size
-        start_y = rect_y - self.rect_height_size
-
-        end_x = rect_x + self.rect_width_size
-        end_y = rect_y + self.rect_height_size
-
-        list_x = [start_x + i * self.rect_width_size for i in range(3)]
-        list_y = [start_y + i * self.rect_height_size for i in range(3)]
-
-        for y in list_y:
-            for x in list_x:
-                # Only try to get a rectangle if the coordinates (x, y) is not referring to a rectangle outside the grid
-                if 0 <= x <= end_x and 0 <= y <= end_y:
-                    current_rect = [r for r in self.all_rectangles_list if (r.pos[0]-x) <= tl and (r.pos[1]-y) <= tl]
-                    # Normally current_rect should always contain a Rectangle instance. But let's just test with an if
-                    if current_rect:
-                        rect_list.append(current_rect[0])
-
-        return rect_list
-
-    def get_number_of_close_active_rect_of(self, rect: Rectangle):
-        return len(self.get_surrounding_cells_list(rect=rect))
-
-    # def is_rectangle_active(self, rect: Rectangle) -> bool:
-    #     return rect in self.
-
-    def evaluate_rect_next_state(self, rect: Rectangle):
-        number_of_close_active_rect = self.get_number_of_close_active_rect_of(rect=rect)
-        if (self.is_active and self.number_of_close_active_cells in [2, 3]) or \
-                (not self.is_active and self.number_of_close_active_cells == 3):
-            self.next_state_activate = True
-            self.text_size = '1'
-        else:
-            self.next_state_activate = False
-            self.text_size = '0'
-
-    def evaluate_grid_next_state(self):
-        self.rectangles_with_next_new_state = []
+    def draw_horizontal_and_vertical_lines(self):
+        x0 = 0
+        y0 = 0
+        for i in range(self.nb_cols + 1):
+            self.init_vertical_line(x0=x0, y1=self.size[1])
+            x0 += self.rect_width_size
+        for i in range(self.nb_rows + 1):
+            self.init_horizontal_line(x1=self.size[0], y0=y0)
+            y0 += self.rect_height_size
 
     def generate_grid(self):
         w, h = self.size
@@ -275,16 +171,282 @@ class SimulationGridLayout(BoxLayout):
             y += self.rect_height_size
 
         # After generating the list of rectangles, make a copy of it. This copy should never be changed
-        self.all_rectangles_list = self.active_rectangle_pos_list.copy()
-        x0 = 0
-        y0 = 0
-        for i in range(self.nb_cols + 1):
-            self.init_vertical_line(x0=x0, y1=self.size[1])
-            x0 += self.rect_width_size
-        for i in range(self.nb_rows + 1):
-            self.init_horizontal_line(x1=self.size[0], y0=y0)
-            y0 += self.rect_height_size
+        self.all_rectangles_list = self.rectangles_list_in_canvas.copy()
+        self.draw_horizontal_and_vertical_lines()  # Drawing horizontal and vertical lines as borders
 
+    def is_touch_inside_current_layout(self, touch) -> bool:
+        return touch.y <= self.height
 
-class EvolutionSimulationApp(App):
-    pass
+    def get_rect_from_list(self, obj, rect_list: list):
+        """
+        If the given a Rectangle object or a tuple with (x, y) coordinates is found in the list rect_list, then
+         it that (found) rectangle is returned; else None is returned
+        :param obj: A Kivy Rectangle object or a tuple coordinates (x, y)
+        :param rect_list: List a Kivy Rectangles object
+        :return:
+        """
+        rect_xy = obj
+        _rect = None
+        if isinstance(obj, Rectangle):
+            # print(f"Rectangle given: {obj.pos}")
+            # If Rectangle given, then
+            rect_xy = obj.pos
+            tl = 1 / 10000  # tolerance
+            _rect = [r for r in rect_list if abs(rect_xy[0] - r.pos[0]) <= tl and abs(rect_xy[1] - r.pos[1]) <= tl]
+        else:
+            # print(f"Tuple given: {obj}")
+            _rect = [r for r in rect_list if (rect_xy[0] - self.rect_width_size) <= r.pos[0] <= rect_xy[0]
+                     and (rect_xy[1] - self.rect_height_size) <= r.pos[1] <= rect_xy[1]]
+
+        if _rect is None:
+            return None
+
+        if len(_rect) == 1:
+            return _rect[0]
+
+        return None
+
+    def activate_rectangle(self, rect: Rectangle):
+        """
+         Remove the rectangle from the grid (canvas) to have a black rectangle shape
+         Add the removed rectangle to the list of active rectangle
+        :param rect:
+        :return:
+        """
+        # Remove from the grid
+        self.canvas.remove(rect)
+        # print(f"rect: {rect.pos}")
+        # print(f"rectangles_list_in_canvas: {[r.pos for r in self.rectangles_list_in_canvas]}")
+        # print(f"active_rectangles_list: {[r.pos for r in self.active_rectangles_list]}")
+        self.rectangles_list_in_canvas.remove(rect)
+        # Add to  list of active rectangles
+        self.active_rectangles_list.append(rect)
+
+    def deactivate_rectangle(self, rect: Rectangle):
+        """
+         Remove rectangle from active rectangles list
+         Recreate and place a new rectangle with the same properties as the given rectangle on the grid
+        :param rect:
+        :return:
+        """
+        # Create and add the new rectangle to the grid
+        self.init_rectangle(x=rect.pos[0], y=rect.pos[1],
+                            w=self.rect_width_size, h=self.rect_height_size)
+        # Remove rectangle from the list of active rectangle
+        self.active_rectangles_list.remove(rect)
+
+    def is_rectangle_active(self, obj):
+        return self.get_rect_from_list(obj=obj, rect_list=self.active_rectangles_list) is not None
+
+    def update_rectangle_status_on_touch(self, obj) -> None:
+        if self.is_rectangle_active(obj):  # It was active, so we deactivate it
+            self.deactivate_rectangle(rect=obj)
+        else:  # It was not active, so we activate it
+            self.activate_rectangle(rect=obj)
+
+        # Redraw horizontal and vertical lines
+        self.draw_horizontal_and_vertical_lines()
+
+    def get_surrounding_cells_list(self, rect: Rectangle) -> [Rectangle]:
+        """
+        This function returns the list of all rectangles touching the rectangle given in argument 'rect'
+        :param rect:
+        :return:
+        """
+        # tl = 1 / 1000000
+        rect_list = []
+        rect_x, rect_y = rect.pos
+
+        # 1  2  3
+        # 4  r  6
+        # 7  8  9
+        # r is the rectangle of interest
+        # Each rectangle is surrounded by at most 8 others rectangles
+        # We start by the bottom left rectangle, progress left to right, down to up, and finish by the top right
+        ws, hs = self.rect_width_size, self.rect_height_size
+
+        start_x = rect_x - ws
+        start_y = rect_y - hs
+
+        end_x = rect_x + ws
+        end_y = rect_y + hs
+
+        list_x = [start_x + i * ws for i in range(3)]
+        list_y = [start_y + i * hs for i in range(3)]
+
+        count_rect = 1  # the 5th rectangle should be skipped as it refers to the rectangle of interest ('rect' param)
+        for y in list_y:
+            for x in list_x:
+                if count_rect != 5:  # skipping the 5th rectangle
+                    # Only try to get a rectangle if the coordinates (x, y) is not referring
+                    # to a rectangle outside the grid
+                    # the ws/2 and hs/2 are there as tolerances (a bit big but still fair) to avoid prevent not getting
+                    # a rectangle due to Python comparison. could have also used tolerance = 1/10000 instead
+                    if 0 <= x <= end_x + ws / 2 and 0 <= y <= end_y + hs / 2:
+                        # print(f"iter {count_rect} / x, y: {x, y}")
+                        current_rect = self.get_rect_from_list(obj=(x + ws / 2, y + hs / 2),
+                                                               rect_list=self.all_rectangles_list)
+                        # Normally current_rect should always contain a Rectangle instance.
+                        # But let's just test with an if
+                        if current_rect:
+                            rect_list.append(current_rect)
+                count_rect += 1
+
+        return rect_list
+
+    def get_number_of_close_active_rect_of(self, rect: Rectangle):
+        list_surrounding_rect = self.get_surrounding_cells_list(rect=rect)
+
+        list_active_rect = [r for r in list_surrounding_rect if self.is_rectangle_active(obj=r)]
+
+        return len(list_active_rect)
+
+    def is_rectangle_next_state_active(self, rect: Rectangle) -> bool:
+        # print("-- is_rectangle_next_state_active--")
+        number_of_close_active_rect = self.get_number_of_close_active_rect_of(rect=rect)
+        is_rect_active = self.is_rectangle_active(obj=rect)
+
+        if (is_rect_active and number_of_close_active_rect in [2, 3]) or \
+                (not is_rect_active and number_of_close_active_rect == 3):
+            return True
+        else:
+            return False
+
+    def evaluate_grid_next_state(self) -> None:
+        """
+        Evaluate the status (active?) of each rectangle for the next generation
+         Refresh list of active rectangles that will remain active in the next generation
+         Refresh list of active rectangles that will be deactivated in the next generation
+         Refresh list of no-active rectangles that will be activated in the next generation
+        :return:
+        """
+        # print("------------ evaluate_grid_next_state")
+        # Get list of active rectangles to keep active in the next generation
+        active_rectangles_to_keep_active = [r for r in self.active_rectangles_list
+                                            if self.is_rectangle_next_state_active(rect=r)]
+
+        # Get list of non-active rectangles to be active in the next generation
+        # get list of rectangles close to each active rectangles
+        list_close_rect = [[rect for rect in self.get_surrounding_cells_list(r)] for r in self.active_rectangles_list]
+        list_close_rect = [r[i] for r in list_close_rect for i in range(len(r))]
+        # print(f"list_close_rect: {[r.pos for r in list_close_rect]}")
+        list_close_rect = remove_duplicates_rect(rect_list=list_close_rect)
+        # print(f"After remove_duplicates_rect list_close_rect: {[r.pos for r in list_close_rect]}")
+        nonactive_rectangles_to_be_activated = [r for r in list_close_rect if
+                                                self.is_rectangle_next_state_active(rect=r)]
+        # print(f"nonactive_rectangles_to_be_activated: {[r.pos for r in nonactive_rectangles_to_be_activated]}")
+        # List of all rectangles to be activated in the next generation
+        self.rectangles_to_be_active_in_next_generation = active_rectangles_to_keep_active + \
+                                                          nonactive_rectangles_to_be_activated
+
+        # Get list of active rectangles to be deactivated in the next generation
+        # Those are active rectangles that are not in the list of rectangles to be activated in the next generation
+        self.rectangles_to_deactivate_in_next_generation = [r for r in self.active_rectangles_list
+                                                            if r not in self.rectangles_to_be_active_in_next_generation]
+
+    def on_touch_down(self, touch):
+        """
+         change cell color
+         if cell was active then remove it from active cells list and add it to the list of non-active cells
+         if cell was not active then remove it from non-active cells list and add it to the list of active cells
+         Evaluate the next state of the grid
+        :param touch:
+        :return:
+        """
+        if self.is_touch_inside_current_layout(touch):
+            # print(f"-------------------on_touch_down-----------------------")
+
+            # Get the clicked rectangle
+            touched_rect = self.get_rect_from_list(obj=touch.pos, rect_list=self.all_rectangles_list)
+
+            if touched_rect is not None:
+                # print(f"touched_rect: {touched_rect.pos}")
+                # Since we got the touched rectangle, now we need to change it's color by activating or deactivating it
+                self.update_rectangle_status_on_touch(obj=touched_rect)  # Updating new status: black or white
+
+                # Evaluate the next state of the grid
+                self.evaluate_grid_next_state()
+
+                # print(f"AF EV - rectangles_list_in_canvas: {[r.pos for r in self.rectangles_list_in_canvas]}")
+                # print(f"AF EV - active_rectangles_list: {[r.pos for r in self.active_rectangles_list]}")
+                # print(f"AF EV - self.rectangles_to_be_active_in_next_generation: "
+                #       f"{[r.pos for r in self.rectangles_to_be_active_in_next_generation]}")
+
+            else:
+                print(f"ERROR: No rectangle found at this coordinate: {touch.pos}")
+
+    def update_grid(self, *args):
+        # Get list rectangles to be active at the next generation
+        # current active rectangles that are not in the list of rectangles to be activated at the next generation
+        # those should be deactivated during the update
+        self.rectangles_to_deactivate_in_next_generation = [r for r in self.active_rectangles_list
+                                                            if r not in self.rectangles_to_be_active_in_next_generation]
+
+        self.rectangles_to_be_active_in_next_generation = remove_duplicates_rect(
+            self.rectangles_to_be_active_in_next_generation)
+        self.rectangles_to_deactivate_in_next_generation = remove_duplicates_rect(
+            self.rectangles_to_deactivate_in_next_generation)
+
+        # Activate cells
+        list_rect_to_activate = [self.get_rect_from_list(
+            obj=r, rect_list=self.all_rectangles_list) for r in self.rectangles_to_be_active_in_next_generation]
+        for rect in list_rect_to_activate:
+            if not self.is_rectangle_active(obj=rect):
+                self.activate_rectangle(rect=rect)
+
+        # deactivate cells
+        list_rect_to_deactivate = [self.get_rect_from_list(
+            obj=r, rect_list=self.all_rectangles_list) for r in self.rectangles_to_deactivate_in_next_generation]
+        for rect in list_rect_to_deactivate:
+            self.deactivate_rectangle(rect=rect)
+
+        # Redraw horizontal and vertical lines
+        self.draw_horizontal_and_vertical_lines()
+
+        self.canvas.ask_update()
+
+        self.generation_number += 1
+        self.generation = f"{self.generation_default}: {self.generation_number}"
+
+        # Evaluate grid for next generation
+        self.evaluate_grid_next_state()
+
+    # def update_start_button(self):
+    #     # <a target="_blank" href="https://icons8.com/icon/60449/play-button-circled">Play Button Circled</a>
+    #     # icon by <a target="_blank" href="https://icons8.com">Icons8</a>
+    #     if self.in_simulation:
+    #         self.start_button.background_normal = pause_button_logo_name
+    #     else:
+    #         self.start_button.background_normal = start_button_logo_name
+
+    # def start_simulation(self):
+    #     if not self.in_simulation:
+    #         self.in_simulation = True
+    #         print('Starting simulation...')
+    #         self.update_start_button()
+    #     else:
+    #         self.in_simulation = False
+    #         print('Pausing simulation...')
+    #         self.update_start_button()
+
+    # def start(self):
+    #     # Defining job to do every a certain amount of time
+    #     schedule.every(self.run_interval_seconds).seconds.do(self.start_simulation)
+    #
+    #     while self.in_simulation:
+    #         schedule.run_pending()
+    #         time.sleep(.5)
+
+    def reset_grid(self) -> None:
+        """
+        Reset the grid by deactivating all active cells (rectangles)
+        :return:
+        """
+        if not self.in_simulation:
+            to_be_deactivated = self.active_rectangles_list.copy()
+            [self.deactivate_rectangle(rect=r) for r in to_be_deactivated]
+            self.draw_horizontal_and_vertical_lines()  # Redraw horizontal and vertical lines
+
+            # Reset generation counter
+            self.generation_number = 0
+            self.generation = self.generation_default
