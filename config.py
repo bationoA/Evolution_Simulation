@@ -13,4 +13,6 @@ restart_button_logo_name = 'resources/images/icons8-rotate-48.png'
 reset_button_logo_name = 'resources/images/icons8-return-48.png'
 save_button_logo_name = 'resources/images/icons8-save-48.png'
 predefined_button_logo_name = 'resources/images/icons8-bookmark-48.png'
-run_interval_seconds = 1
+run_interval_seconds = .1
+grid_rows = 50
+grid_cols = 'auto'  # 'auto' = 2 * grid_rows

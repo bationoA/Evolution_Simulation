@@ -18,7 +18,7 @@ MainInterface:
         spacing: 10
         canvas:
             Color:
-                rgba: 0, 0, 0 , .5
+                rgba: 0, 0, 0 , .9
             Rectangle:
                 size: self.size
 
@@ -30,7 +30,7 @@ MainInterface:
             size_hint: (menu_start_button_width*.7, .85)
             # size: self.texture_size
             pos_hint: {'center_x': 0.02}
-            on_press: id_SimulationBoxLayout.reset_grid()
+            # on_press: id_SimulationBoxLayout.reset_grid()
 
         Label:
             id: gen_label_id_HorizontalMenuLayout
@@ -61,16 +61,27 @@ MainInterface:
             # on_press: id_SimulationBoxLayout.start_simulation()
 
         Button:
+            id: id_button_delete
+            # text: 'Save'
+            background_normal: id_HorizontalMenuLayout.save_btn_logo
+            background_color: (1, 0, 0, .5)
+            size_hint: (menu_start_button_width*.6, .6)
+            size: self.texture_size
+            pos_hint: {'center_x': .6}
+            # on_release: id_SimulationBoxLayout.on_save_icon_clicked()
+
+        Button:
             id: id_button_save
-            # text: 'Mark'
+            # text: 'Save'
             background_normal: id_HorizontalMenuLayout.save_btn_logo
             background_color: (1, 1, 1, 1)
             size_hint: (menu_start_button_width*.6, .6)
             size: self.texture_size
             pos_hint: {'center_x': .9}
+            # on_release: id_SimulationBoxLayout.on_save_icon_clicked()
 
         Button:
-            id: id_button_Predefined_initial_state
+            id: id_button_bookmarks_state
             text: 'Bookmarks'
             background_normal: id_HorizontalMenuLayout.predefined_btn_logo
             background_color: (1, 1, 1, 1)
@@ -81,11 +92,11 @@ MainInterface:
 
     GridZoneLayout:
         size_hint: (1, .9)
-        #canvas.before:
-         #   Color:
-          #      rgba: 1, 1, 1, 1
-           # Rectangle:
-            #    size: self.size
+        canvas.before:
+            Color:
+                rgba: 0, 0, 0, 1
+            Rectangle:
+                size: self.size
         SimulationBoxLayout:
             id: id_SimulationBoxLayout
             size_hint: (1, 1)

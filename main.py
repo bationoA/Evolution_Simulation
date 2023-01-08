@@ -1,13 +1,19 @@
+from kivy.app import App
 from kivy.clock import Clock
+from kivymd.app import MDApp
 
 from functions import *
+
 import schedule
 from kivy.uix.widget import Widget
 
 
-class EvolutionSimulationApp(App):
+class EvolutionSimulationApp(MDApp):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.button_delete = None
+        self.button_save = None
+        self.reset_button = None
         self.in_simulation = False
         self.grid_zone_layout = None
         self.start_button = None
@@ -19,11 +25,15 @@ class EvolutionSimulationApp(App):
         self.simulation = self.root.ids.id_SimulationBoxLayout
         # Get a reference to the Button widget
         self.start_button = self.root.ids.id_start_button
+        self.button_delete = self.root.ids.id_button_delete
+        self.button_save = self.root.ids.id_button_save
+        self.reset_button = self.root.ids.id_button_reset_grid
 
-        print(f"self.root : {self.root}")
-        print(f"self.start_button : {self.start_button}")
         # Bind the Button's on_release event to the button_callback method
         self.start_button.bind(on_release=self.start_simulation)
+        self.button_delete.bind(on_release=self.on_delete_state_icon_clicked)
+        self.button_save.bind(on_release=self.on_save_icon_clicked)
+        self.reset_button.bind(on_release=self.reset_grid)
 
     def update_start_button(self):
         # <a target="_blank" href="https://icons8.com/icon/60449/play-button-circled">Play Button Circled</a>
@@ -34,19 +44,50 @@ class EvolutionSimulationApp(App):
             self.start_button.background_normal = start_button_logo_name
 
     def start_simulation(self, *args):
-        print(f"start_simulation")
         if not self.in_simulation:
             self.in_simulation = True
             print('Starting simulation...')
             self.update_start_button()
             # Schedule the update_grid method to be called every 1 second
-            Clock.schedule_interval(self.simulation.update_grid, 1)
+            Clock.schedule_interval(self.simulation.update_grid, run_interval_seconds)
         else:
             self.in_simulation = False
             print('Pausing simulation...')
             self.update_start_button()
             # Stop the clock
             Clock.unschedule(self.simulation.update_grid)
+
+    def on_save_icon_clicked(self, *args):
+        if self.in_simulation:
+            self.simulation.show_toast(message="Cannot save while in simulation...", bg_col=[1, 0, 0, .5])
+        else:
+            if self.simulation.active_rectangles_list:
+                self.simulation.save_state_modal.open()
+            else:
+                self.simulation.show_toast(message="Nothing to save", bg_col=[0, 0, 0, .5])
+
+    def reset_grid(self, *args) -> None:
+        """
+        Reset the grid by deactivating all active cells (rectangles)
+        :return:
+        """
+        print(f"self.in_simulation: {self.in_simulation}")
+        if not self.in_simulation:
+            print(f"In self.in_simulation True: {self.in_simulation}")
+            self.simulation.reset_grid()
+        else:
+            self.simulation.show_toast(message="Cannot reset while in simulation", bg_col=[1, 0, 0, .5])
+            print("Still in simulation...")
+
+    def on_delete_state_icon_clicked(self, *args):
+        if self.in_simulation:
+            self.simulation.show_toast(message="Cannot delete while in simulation...", bg_col=[1, 0, 0, .5])
+        else:
+            if self.simulation.current_selected_state_index is not None:
+                self.simulation.delete_state_modal.open()
+            else:
+                self.simulation.show_toast(message="Nothing to delete", bg_col=[0, 0, 0, .5])
+
 
 
 # Run the app

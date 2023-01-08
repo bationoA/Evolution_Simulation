@@ -1,50 +1,53 @@
+import datetime
 import json
-import random
 from typing import List
 
-import numpy as np
-
 from kivy.config import Config
-from kivy.properties import StringProperty
+from kivy.properties import StringProperty, ObjectProperty
 from kivy.uix.dropdown import DropDown
+from kivy.uix.label import Label
+from kivy.uix.modalview import ModalView
+from kivy.uix.textinput import TextInput
+from kivymd.uix.boxlayout import MDBoxLayout
+from kivymd.uix.button import MDTextButton
+from kivymd.uix.gridlayout import MDGridLayout
+from kivymd.uix.label import MDLabel
+from kivymd.uix.relativelayout import MDRelativeLayout
 
-Config.set('graphics', 'resizable', '0')
-import time
-
-import schedule
-from kivy.app import App
 from kivy.graphics import Rectangle, Color, Line
 from kivy.metrics import dp
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
-from kivy.uix.gridlayout import GridLayout
-from kivy.uix.stacklayout import StackLayout
+from kivymd.toast import toast
 from kivy.uix.relativelayout import RelativeLayout
 from kivy.uix.widget import Widget
 from kivy.core.window import Window
 from config import *
 
+Config.set('graphics', 'resizable', '0')
+
 Window.size = (window_width, window_height)
 Window.minimum_width, Window.minimum_height = Window.size
+Window.maximum_width, Window.maximum_height = Window.size
+
 Window.clearcolor = window_background_color
 
 
 # Create a custom widget to hold the grid
-class MainInterface(BoxLayout):
+class MainInterface(MDBoxLayout):
     pass
 
 
-def save_initial_sate(active_cells_coord: list):
-    with open('resources/logs/predefined_states.json', 'r') as f:
-        predefined_states = json.load(f)
-
-    predefined_states.append(active_cells_coord)
-
-    with open('resources/logs/predefined_states.json', 'w'):
-        json.dump(predefined_states)
+# Define a custom grid layout class with a method to change the background color of a cell
+def remove_duplicates_rect(rect_list: List[Rectangle]) -> list:
+    return list(set(rect_list))
 
 
-class HorizontalMenuLayout(RelativeLayout):
+class StateButton(Button):
+    custom_id = ObjectProperty(None)
+
+
+class HorizontalMenuLayout(MDRelativeLayout):
     start_btn_logo = StringProperty()
     restart_btn_logo = StringProperty()
     reset_btn_logo = StringProperty()
@@ -59,48 +62,86 @@ class HorizontalMenuLayout(RelativeLayout):
         self.save_btn_logo = save_button_logo_name
         self.predefined_btn_logo = predefined_button_logo_name
         self.dropdown_button = None
+        self.dropdown_items = []
+        self.dropdown_items_custom_ids = []
 
     def on_kv_post(self, *args):
         # Get the main button to open the dropdown menu
-        self.dropdown_button = self.parent.ids.id_button_Predefined_initial_state
+        self.dropdown_button = self.parent.ids.id_button_bookmarks_state
+        # self.dropdown_button.opacity = 1
+        # self.dropdown_button.disabled = False
         self.right_dopdown_menu()
 
     def right_dopdown_menu(self):
         dropdown = DropDown()
 
-        with open('resources/logs/predefined_states.json', 'r') as f:
-            predefined_states = json.load(f)
+        with open('resources/logs/saved_states.json', 'r') as f:
+            saved_states = json.load(f)
 
-        for itm in predefined_states:
+        for itm in saved_states:
             # Create buttons and Add them to the dropdown menu
-            dropdown.add_widget(Button(text=itm['name'], size_hint_y=None, height=44))
+            btn = StateButton(custom_id=itm['id'], text=itm['name'], size_hint_y=None, height=44)
+            self.dropdown_items.append(btn)
+            self.dropdown_items_custom_ids.append(itm['id'])
+            dropdown.add_widget(btn)
 
         # Attach the dropdown menu to the main button
-        self.dropdown_button.bind(on_release=dropdown.open)
+        # self.dropdown_button.bind(on_release=self.dropdown.open)
+        # dropdown.open(self.dropdown_button)
+        self.dropdown_button.bind(on_release=lambda widget: dropdown.open(widget))
 
 
-class GridZoneLayout(BoxLayout):
+class GridZoneLayout(MDBoxLayout):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.height = window_height * GridZoneLayout_height_proportion
         self.width = window_width * GridZoneLayout_width_proportion
 
 
-# Define a custom grid layout class with a method to change the background color of a cell
-def remove_duplicates_rect(rect_list: List[Rectangle]) -> list:
-    return list(set(rect_list))
+class SaveStateModal(ModalView):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.glyt = MDGridLayout(rows=1, cols=3, md_bg_color=(1, 1, 1, 1), size_hint=(1, 1), padding=5)
+        self.glyt.add_widget(MDLabel(text="Name:", size_hint=(.1, .1)))
+        self.text_input = TextInput(multiline=False, font_size=30, size_hint=(.8, .1))
+        self.submit_button = Button(text="Save", size_hint=(.1, .1),
+                                    color=(1, 1, 1, 1),
+                                    background_color=(0, 1, 0, 1))
+        self.glyt.add_widget(self.text_input)
+        self.glyt.add_widget(widget=self.submit_button)
+        self.add_widget(widget=self.glyt)
 
 
-class SimulationBoxLayout(BoxLayout):
+class DeleteStateModal(ModalView):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.glyt = MDGridLayout(rows=1, cols=2, md_bg_color=(1, 1, 1, 1), size_hint=(1, 1), padding=5)
+        self.cancel = Button(text="Cancel",
+                             size_hint=(.7, .1),
+                             color=(1, 1, 1, 1),
+                             background_color=(0, 0, 1, 1))
+        self.yes_delete = Button(text="Yes Delete",
+                                 size_hint=(.3, .1),
+                                 color=(1, 1, 1, 1),
+                                 background_color=(0, 0, 0, 1))
+        self.glyt.add_widget(widget=self.cancel)
+        self.glyt.add_widget(widget=self.yes_delete)
+        self.add_widget(widget=self.glyt)
+
+
+class SimulationBoxLayout(MDBoxLayout):
     generation = StringProperty()
+    # current_selected_state_index = StringProperty()
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.save_state_text_input = None
+        self.save_state_submit_button = None
         self.start_button = None
         self.rect_width_size = None
         self.rect_height_size = None
-        self.nb_rows = 50
-        self.nb_cols = 2 * self.nb_rows
+        self.nb_rows = grid_rows
+        self.nb_cols = grid_cols if isinstance(grid_cols, int) else 2 * grid_rows
         self.horizontal_lines_coords = []
         self.vertical_lines_coords = []
         self.rectangles_list_in_canvas = []
@@ -113,15 +154,35 @@ class SimulationBoxLayout(BoxLayout):
         self.generation_number = 0
         self.in_simulation = False
         self.run_interval_seconds = run_interval_seconds
+        self.toast_position = None
+        self.save_state_modal = SaveStateModal(size_hint=(0.5, 0.08))
+        self.save_state_modal_submit_button = self.save_state_modal.submit_button
+        self.current_selected_state_index = None
+        self.delete_state_modal = DeleteStateModal(size_hint=(0.5, 0.04))
+        self.delete_state_modal_yes_button = self.delete_state_modal.yes_delete
+        self.delete_state_modal_cancel_button = self.delete_state_modal.cancel
 
     def on_kv_post(self, *args):
         # When Layouts are rendered then...
         # Get starting button
-        self.start_button = self.parent.parent.ids.id_start_button
+        self.start_button = self.parent.parent.ids.id_button_save
+
+        print(f"self.delete_state_modal_yes_button: {self.delete_state_modal_yes_button}")
+        print(f"self.delete_state_modal_cancel_button: {self.delete_state_modal_cancel_button}")
+        self.save_state_modal_submit_button.bind(on_release=self.save_sate)
+        self.delete_state_modal_yes_button.bind(on_release=self.delete_state)
+        self.delete_state_modal_cancel_button.bind(on_release=self.cancel_delete_state)
+
+        # Get Save button position
+        save_button = self.parent.parent.ids.id_start_button
+        self.toast_position = (save_button.pos[0], save_button.pos[1] - .02)
 
         self.size = self.parent.size
         # Generate grid
         self.generate_grid()
+
+        #
+        self.bind_dorpdown_items_to_action()
 
     def init_vertical_line(self, x0: float, y1: float, y0=0):
         self.vertical_lines_coords.append([x0, y0, x0, y1])
@@ -157,6 +218,116 @@ class SimulationBoxLayout(BoxLayout):
             self.init_horizontal_line(x1=self.size[0], y0=y0)
             y0 += self.rect_height_size
 
+    def bind_dorpdown_items_to_action(self):
+        horizontal_menu_layout = self.parent.parent.ids.id_HorizontalMenuLayout
+        if horizontal_menu_layout.dropdown_items:
+            for btn in horizontal_menu_layout.dropdown_items:
+                btn.bind(on_release=self.load_state)
+
+    def load_state(self, *args):
+        horizontal_menu_layout = self.parent.parent.ids.id_HorizontalMenuLayout
+        dropdown_items = horizontal_menu_layout.dropdown_items
+        btn_ids_list = horizontal_menu_layout.dropdown_items_custom_ids
+        btn = args
+        btn_address = str(btn).split('at')[-1].replace('>,)', '')
+        index = [dropdown_items.index(b) for b in dropdown_items if btn_address in str(b)]
+        if index:
+            index = index[0]
+            state = None
+            # Get state
+            try:
+                with open('resources/logs/saved_states.json', 'r') as f:
+                    states = json.load(f)
+
+                state = [st for st in states if st['id'] == str(btn_ids_list[index])]
+            except Exception as e:
+                print(f"Error: {str(e)}")
+
+            if state:
+                state = state[0]
+                # Reset the grid
+                self.reset_grid()
+                # get and activate the cells related to the state
+                for pos in state['coordinates']:
+                    rect = self.get_rect_from_list(obj=pos, rect_list=self.all_rectangles_list, as_rectangle=True)
+                    self.activate_rectangle(rect=rect)
+
+                # Toast message: Loaded
+                self.show_toast(message="Loaded", bg_col=[0, 0, 0, .5])
+
+                # Evaluate grid next status
+                self.evaluate_grid_next_state()
+
+                self.current_selected_state_index = index
+            else:
+                msg = "Unable to load the state"
+                self.show_toast(message=msg, bg_col=[1, 0, 0, .5])
+                print(msg)
+        else:
+            msg = f"Error: load_state - index = {index} in dropdown_items: {dropdown_items}"
+            self.show_toast(message=msg, bg_col=[1, 0, 0, .5])
+            print(msg)
+
+    def save_sate(self, *args):
+        self.show_toast(message="Saving...", bg_col=[0, 0, 0, .5])
+        success = True
+        index = str(datetime.datetime.now().timestamp())
+        name = self.save_state_modal.text_input.text
+        rects_position = [r.pos for r in self.active_rectangles_list]
+        state = dict(id=index,
+                     name=name,
+                     coordinates=rects_position
+                     )
+        try:
+            with open('resources/logs/saved_states.json', 'r') as f:
+                states = json.load(f)
+            states.append(state)
+
+            with open('resources/logs/saved_states.json', 'w') as f:
+                json.dump(states, f, indent=4, sort_keys=True)
+        except Exception as e:
+            success = False
+            print("An Error occurred while saving")
+            print(str(e))
+            self.show_toast(message="An Error occurred while saving", bg_col=[1, 0, 0, .5])
+
+        if success:
+            self.current_selected_state_index = index  # So that the user can delete it right after it's create
+            self.save_state_modal.dismiss()
+            self.show_toast(message="State saved.")
+            # Refresh dropdown menu items list
+            self.parent.parent.ids.id_HorizontalMenuLayout.right_dopdown_menu()
+            # Bind action to items
+            self.bind_dorpdown_items_to_action()
+        return success
+
+    def delete_state(self, *args):
+        success = True
+        try:
+            with open('resources/logs/saved_states.json', 'r') as f:
+                states = json.load(f)
+            states.remove(states[int(self.current_selected_state_index)])
+
+            with open('resources/logs/saved_states.json', 'w') as f:
+                json.dump(states, f, indent=4, sort_keys=True)
+        except Exception as e:
+            success = False
+            print("An Error occurred while deleting")
+            print(str(e))
+            self.show_toast(message="An Error occurred while deleting", bg_col=[1, 0, 0, .5])
+
+        if success:
+            self.show_toast(message="State removed", )
+            # Refresh dropdown menu items list
+            self.parent.parent.ids.id_HorizontalMenuLayout.right_dopdown_menu()
+            # Bind action to items
+            self.bind_dorpdown_items_to_action()
+
+        self.delete_state_modal.dismiss()  # close delete state modal
+
+    def cancel_delete_state(self, *args):
+        self.delete_state_modal.dismiss()
+
     def generate_grid(self):
         w, h = self.size
         self.rect_height_size = h / self.nb_rows
@@ -177,20 +348,22 @@ class SimulationBoxLayout(BoxLayout):
     def is_touch_inside_current_layout(self, touch) -> bool:
         return touch.y <= self.height
 
-    def get_rect_from_list(self, obj, rect_list: list):
+    def get_rect_from_list(self, obj, rect_list: list, as_rectangle=False):
         """
         If the given a Rectangle object or a tuple with (x, y) coordinates is found in the list rect_list, then
          it that (found) rectangle is returned; else None is returned
         :param obj: A Kivy Rectangle object or a tuple coordinates (x, y)
         :param rect_list: List a Kivy Rectangles object
+        :param as_rectangle:
         :return:
         """
         rect_xy = obj
         _rect = None
-        if isinstance(obj, Rectangle):
+        if isinstance(obj, Rectangle) or as_rectangle:
             # print(f"Rectangle given: {obj.pos}")
             # If Rectangle given, then
-            rect_xy = obj.pos
+            if isinstance(obj, Rectangle):
+                rect_xy = obj.pos
             tl = 1 / 10000  # tolerance
             _rect = [r for r in rect_list if abs(rect_xy[0] - r.pos[0]) <= tl and abs(rect_xy[1] - r.pos[1]) <= tl]
         else:
@@ -213,11 +386,10 @@ class SimulationBoxLayout(BoxLayout):
         :param rect:
         :return:
         """
+        self.current_selected_state_index = None  # Set to " to prevent accidental deletion
+
         # Remove from the grid
         self.canvas.remove(rect)
-        # print(f"rect: {rect.pos}")
-        # print(f"rectangles_list_in_canvas: {[r.pos for r in self.rectangles_list_in_canvas]}")
-        # print(f"active_rectangles_list: {[r.pos for r in self.active_rectangles_list]}")
         self.rectangles_list_in_canvas.remove(rect)
         # Add to  list of active rectangles
         self.active_rectangles_list.append(rect)
@@ -229,6 +401,8 @@ class SimulationBoxLayout(BoxLayout):
         :param rect:
         :return:
         """
+        self.current_selected_state_index = None  # Set to None to prevent accidental deletion
+
         # Create and add the new rectangle to the grid
         self.init_rectangle(x=rect.pos[0], y=rect.pos[1],
                             w=self.rect_width_size, h=self.rect_height_size)
@@ -253,7 +427,6 @@ class SimulationBoxLayout(BoxLayout):
         :param rect:
         :return:
         """
-        # tl = 1 / 1000000
         rect_list = []
         rect_x, rect_y = rect.pos
 
@@ -367,11 +540,6 @@ class SimulationBoxLayout(BoxLayout):
                 # Evaluate the next state of the grid
                 self.evaluate_grid_next_state()
 
-                # print(f"AF EV - rectangles_list_in_canvas: {[r.pos for r in self.rectangles_list_in_canvas]}")
-                # print(f"AF EV - active_rectangles_list: {[r.pos for r in self.active_rectangles_list]}")
-                # print(f"AF EV - self.rectangles_to_be_active_in_next_generation: "
-                #       f"{[r.pos for r in self.rectangles_to_be_active_in_next_generation]}")
-
             else:
                 print(f"ERROR: No rectangle found at this coordinate: {touch.pos}")
 
@@ -411,42 +579,21 @@ class SimulationBoxLayout(BoxLayout):
         # Evaluate grid for next generation
         self.evaluate_grid_next_state()
 
-    # def update_start_button(self):
-    #     # <a target="_blank" href="https://icons8.com/icon/60449/play-button-circled">Play Button Circled</a>
-    #     # icon by <a target="_blank" href="https://icons8.com">Icons8</a>
-    #     if self.in_simulation:
-    #         self.start_button.background_normal = pause_button_logo_name
-    #     else:
-    #         self.start_button.background_normal = start_button_logo_name
+    def show_toast(self, message, bg_col=None):
+        if bg_col is None:
+            bg_col = [0, 1, 0, .5]
+        toast(text=message,
+              background=bg_col
+              )
 
-    # def start_simulation(self):
-    #     if not self.in_simulation:
-    #         self.in_simulation = True
-    #         print('Starting simulation...')
-    #         self.update_start_button()
-    #     else:
-    #         self.in_simulation = False
-    #         print('Pausing simulation...')
-    #         self.update_start_button()
+    def reset_grid(self):
+        to_be_deactivated = self.active_rectangles_list.copy()
+        [self.deactivate_rectangle(rect=r) for r in to_be_deactivated]
+        self.draw_horizontal_and_vertical_lines()  # Redraw horizontal and vertical lines
 
-    # def start(self):
-    #     # Defining job to do every a certain amount of time
-    #     schedule.every(self.run_interval_seconds).seconds.do(self.start_simulation)
-    #
-    #     while self.in_simulation:
-    #         schedule.run_pending()
-    #         time.sleep(.5)
+        # Reset generation counter
+        self.generation_number = 0
+        self.generation = self.generation_default
 
-    def reset_grid(self) -> None:
-        """
-        Reset the grid by deactivating all active cells (rectangles)
-        :return:
-        """
-        if not self.in_simulation:
-            to_be_deactivated = self.active_rectangles_list.copy()
-            [self.deactivate_rectangle(rect=r) for r in to_be_deactivated]
-            self.draw_horizontal_and_vertical_lines()  # Redraw horizontal and vertical lines
-
-            # Reset generation counter
-            self.generation_number = 0
-            self.generation = self.generation_default
+        # Delete al active cells and run a next state evaluation to reset 'to be activate' and 'desactivated' list
+        self.evaluate_grid_next_state()
