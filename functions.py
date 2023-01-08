@@ -15,8 +15,6 @@ from kivymd.uix.label import MDLabel
 from kivymd.uix.relativelayout import MDRelativeLayout
 
 from kivy.graphics import Rectangle, Color, Line
-from kivy.metrics import dp
-from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivymd.toast import toast
 from kivy.uix.relativelayout import RelativeLayout
