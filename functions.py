@@ -3,13 +3,12 @@ import json
 from typing import List
 
 from kivy.config import Config
-from kivy.properties import StringProperty, ObjectProperty
+from kivy.properties import StringProperty, ObjectProperty, ListProperty
 from kivy.uix.dropdown import DropDown
 from kivy.uix.label import Label
 from kivy.uix.modalview import ModalView
 from kivy.uix.textinput import TextInput
 from kivymd.uix.boxlayout import MDBoxLayout
-from kivymd.uix.button import MDTextButton
 from kivymd.uix.gridlayout import MDGridLayout
 from kivymd.uix.label import MDLabel
 from kivymd.uix.relativelayout import MDRelativeLayout
@@ -50,7 +49,7 @@ class HorizontalMenuLayout(MDRelativeLayout):
     restart_btn_logo = StringProperty()
     reset_btn_logo = StringProperty()
     save_btn_logo = StringProperty()
-    predefined_btn_logo = StringProperty()
+    bookmarks_btn_logo = StringProperty()
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -58,7 +57,8 @@ class HorizontalMenuLayout(MDRelativeLayout):
         self.restart_btn_logo = restart_button_logo_name
         self.reset_btn_logo = reset_button_logo_name
         self.save_btn_logo = save_button_logo_name
-        self.predefined_btn_logo = predefined_button_logo_name
+        self.delete_btn_logo = delete_button_logo_name
+        self.bookmarks_btn_logo = bookmarks_button_logo_name
         self.dropdown_button = None
         self.dropdown_items = []
         self.dropdown_items_custom_ids = []
@@ -129,7 +129,6 @@ class DeleteStateModal(ModalView):
 
 class SimulationBoxLayout(MDBoxLayout):
     generation = StringProperty()
-    # current_selected_state_index = StringProperty()
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -159,14 +158,15 @@ class SimulationBoxLayout(MDBoxLayout):
         self.delete_state_modal = DeleteStateModal(size_hint=(0.5, 0.04))
         self.delete_state_modal_yes_button = self.delete_state_modal.yes_delete
         self.delete_state_modal_cancel_button = self.delete_state_modal.cancel
+        self.initial_state = None
 
     def on_kv_post(self, *args):
         # When Layouts are rendered then...
         # Get starting button
         self.start_button = self.parent.parent.ids.id_button_save
 
-        print(f"self.delete_state_modal_yes_button: {self.delete_state_modal_yes_button}")
-        print(f"self.delete_state_modal_cancel_button: {self.delete_state_modal_cancel_button}")
+        # print(f"self.delete_state_modal_yes_button: {self.delete_state_modal_yes_button}")
+        # print(f"self.delete_state_modal_cancel_button: {self.delete_state_modal_cancel_button}")
         self.save_state_modal_submit_button.bind(on_release=self.save_sate)
         self.delete_state_modal_yes_button.bind(on_release=self.delete_state)
         self.delete_state_modal_cancel_button.bind(on_release=self.cancel_delete_state)
@@ -243,20 +243,10 @@ class SimulationBoxLayout(MDBoxLayout):
 
             if state:
                 state = state[0]
-                # Reset the grid
-                self.reset_grid()
-                # get and activate the cells related to the state
-                for pos in state['coordinates']:
-                    rect = self.get_rect_from_list(obj=pos, rect_list=self.all_rectangles_list, as_rectangle=True)
-                    self.activate_rectangle(rect=rect)
-
-                # Toast message: Loaded
-                self.show_toast(message="Loaded", bg_col=[0, 0, 0, .5])
-
-                # Evaluate grid next status
-                self.evaluate_grid_next_state()
-
+                self.display_state_on_grid(obj_list=state['coordinates'])
                 self.current_selected_state_index = index
+                # Toast message: Loaded
+                self.show_toast(message="State loaded", bg_col=[0, 0, 0, .5])
             else:
                 msg = "Unable to load the state"
                 self.show_toast(message=msg, bg_col=[1, 0, 0, .5])
@@ -265,6 +255,25 @@ class SimulationBoxLayout(MDBoxLayout):
             msg = f"Error: load_state - index = {index} in dropdown_items: {dropdown_items}"
             self.show_toast(message=msg, bg_col=[1, 0, 0, .5])
             print(msg)
+
+    def display_state_on_grid(self, obj_list, reset_first=True):
+        if reset_first:
+            # Reset the grid
+            self.reset_grid()
+
+        if isinstance(obj_list[0], Rectangle):
+            # get and activate the cells related to the state
+            for r in obj_list:
+                rect = self.get_rect_from_list(obj=r.pos, rect_list=self.all_rectangles_list, as_rectangle=True)
+                self.activate_rectangle(rect=rect)
+        else:
+            # get and activate the cells related to the state
+            for pos in obj_list:
+                rect = self.get_rect_from_list(obj=pos, rect_list=self.all_rectangles_list, as_rectangle=True)
+                self.activate_rectangle(rect=rect)
+
+        # Evaluate grid next status
+        self.evaluate_grid_next_state()
 
     def save_sate(self, *args):
         self.show_toast(message="Saving...", bg_col=[0, 0, 0, .5])
@@ -325,6 +334,12 @@ class SimulationBoxLayout(MDBoxLayout):
 
     def cancel_delete_state(self, *args):
         self.delete_state_modal.dismiss()
+
+    def load_initial_state(self):
+        if self.initial_state is not None:
+            # Display
+            self.display_state_on_grid(obj_list=self.initial_state)
+            self.show_toast(message="Last initial state reloaded", bg_col=[0, 0, 0, .5])
 
     def generate_grid(self):
         w, h = self.size
@@ -536,12 +551,14 @@ class SimulationBoxLayout(MDBoxLayout):
                 self.update_rectangle_status_on_touch(obj=touched_rect)  # Updating new status: black or white
 
                 # Evaluate the next state of the grid
-                self.evaluate_grid_next_state()
+                # self.evaluate_grid_next_state()
 
             else:
                 print(f"ERROR: No rectangle found at this coordinate: {touch.pos}")
 
     def update_grid(self, *args):
+        # Evaluate grid for next generation
+        self.evaluate_grid_next_state()
         # Get list rectangles to be active at the next generation
         # current active rectangles that are not in the list of rectangles to be activated at the next generation
         # those should be deactivated during the update
@@ -574,8 +591,7 @@ class SimulationBoxLayout(MDBoxLayout):
         self.generation_number += 1
         self.generation = f"{self.generation_default}: {self.generation_number}"
 
-        # Evaluate grid for next generation
-        self.evaluate_grid_next_state()
+        print(f"len(self.all_rectangles_list): {len(self.all_rectangles_list)}")
 
     def show_toast(self, message, bg_col=None):
         if bg_col is None:
