@@ -3,6 +3,7 @@ import os.path
 window_width = 1480
 window_height = 800
 
+
 window_background_color = (.1, .1, .1, 1)
 
 HorizontalMenuLayout_height_proportion = .07

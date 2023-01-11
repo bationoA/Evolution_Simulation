@@ -8,6 +8,7 @@ from functions import *
 class EvolutionSimulationApp(MDApp):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.title = "Game of Life"
         self.restart_button = None
         self.button_delete = None
         self.button_save = None

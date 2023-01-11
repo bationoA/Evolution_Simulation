@@ -726,4 +726,4 @@ class SimulationBoxLayout(MDBoxLayout):
 
         # Reset generation counter
         self.generation_number = 0
-        self.generation = self.generation_default
+        self.generation = self.generation_default+" 0"
