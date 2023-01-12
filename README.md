@@ -4,8 +4,8 @@ This is a cellular automaton simulation of the Game of Life invented by mathemat
 ## Illustration images
 - App interface (50 x 100 grid example)
 ![App interface image](https://github.com/bationoA/Evolution_Simulation/blob/main/resources/images/Game-of-Life-intro-0_ed.png)
-- An simulation output
-- ![An simulation output image](https://github.com/bationoA/Evolution_Simulation/blob/main/resources/images/sharingan_ed.png)
+- Example of a simulation output
+- ![Example of a simulation output image](https://github.com/bationoA/Evolution_Simulation/blob/main/resources/images/sharingan_ed.png)
 
 ## Features
 
