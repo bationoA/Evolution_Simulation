@@ -1,13 +1,19 @@
 # Game Of Life | Evolution Simulation
 This is a cellular automaton simulation of the Game of Life invented by mathematician John Horton Conway in 1970. It simulates a grid of cells, where each cell can be in one of two states, alive or dead. The simulation is run in discrete time steps, and at each step, the state of each cell is updated based on the state of its eight neighboring cells. 
 
+## Illustration images
+- App interface (50 x 100 grid example)
+![App interface image](https://github.com/bationoA/Evolution_Simulation/blob/main/resources/images/Game-of-Life-intro-0_ed.png)
+- An simulation output
+- ![An simulation output image](https://github.com/bationoA/Evolution_Simulation/blob/main/resources/images/sharingan_ed.png)
+
 ## Features
 
 - Dynamic and responsive user interface created with Kivy.
-- Zoom in and out of the simulation.
-- Changing the settings of the simulation.
-- Efficient handling of the huge amount of cells using PyQtrees library.
-- Spatial queries like finding all live cells, dead cells or cells that will be dead next turn.
+- Save different states of a simulation.
+- Changing the settings of the simulation (Time between each generation, grid size).
+- Efficient handling of the huge amount of cells using PyQtrees library and The Numpy 2-dimensional array (2d-array).
+- Spatial queries like finding all live cells, dead cells or cells that will be alive/dead next turn.
 
 ## Getting Started
 
@@ -28,9 +34,9 @@ python main.py
 You can customize the app by changing the following parameters in main.py file
 
 - the number of rows and columns of the grid.
-- the shape of the grid ( toroidal or not)
-- the rate of randomness when randomly initializing the grid
+- The window size (in config.py file)
 - and more.
+- Note: The toroidal grid is not implemented
 
 ## Contribution
 
