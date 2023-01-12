@@ -54,7 +54,7 @@ class EvolutionSimulationApp(MDApp):
             self.simulation.initial_state = self.simulation.active_cells_list.copy()
             self.update_start_button()
             # Schedule the update_grid method to be called every run_interval_seconds second
-            Clock.schedule_interval(self.simulation.update_grid, run_interval_seconds)
+            Clock.schedule_interval(self.simulation.update_grid, 1)
         else:
             self.in_simulation = False
             print('Pausing simulation...')
