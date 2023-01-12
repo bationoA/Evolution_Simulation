@@ -4,6 +4,12 @@ MainInterface:
 #:set nb_cols 100
 #:set gen_label_width_size .1
 #:set menu_start_button_width .04
+#:set save_button_width menu_start_button_width*.6
+#:set bookmarks_button_width menu_start_button_width*3
+#:set bookmarks_button_center_x 1-bookmarks_button_width/2
+#:set save_button_center_x 1-bookmarks_button_width-.01
+#:set screenshot_button_center_x 1-bookmarks_button_width-save_button_width-.02
+
 <MainInterface>:
     title: 'My App Name'
     orientation: 'vertical'
@@ -78,7 +84,7 @@ MainInterface:
             background_color: (1, 1, 1, 1)
             size_hint: (menu_start_button_width, .9)
             size: self.texture_size
-            pos_hint: {'center_x': .85}
+            pos_hint: {'center_x': screenshot_button_center_x}
             on_release: id_GridZoneLayout.screenshot_grid()
 
         Button:
@@ -86,19 +92,19 @@ MainInterface:
             # text: 'Save'
             background_normal: id_HorizontalMenuLayout.save_btn_logo
             background_color: (1, 1, 1, 1)
-            size_hint: (menu_start_button_width*.6, .6)
+            size_hint: (save_button_width, .6)
             size: self.texture_size
-            pos_hint: {'center_x': .9}
+            pos_hint: {'center_x': save_button_center_x}
             # on_release: id_SimulationBoxLayout.on_save_icon_clicked()
 
         Button:
             id: id_button_bookmarks_state
-            text: 'Bookmarks'
+            text: 'Saved states'
             background_normal: id_HorizontalMenuLayout.bookmarks_btn_logo
             background_color: (1, 1, 1, 1)
-            size_hint: (menu_start_button_width*1.8, .7)
+            size_hint: (bookmarks_button_width, .7)
             size: self.texture_size
-            pos_hint: {'center_x': 1-menu_start_button_width*.9}
+            pos_hint: {'center_x': bookmarks_button_center_x}
 
 
     GridZoneLayout:

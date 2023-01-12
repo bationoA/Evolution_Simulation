@@ -5,6 +5,7 @@ import sys
 
 import numpy as np
 import pyqtree
+from kivy.clock import Clock
 from kivy.config import Config
 from kivy.properties import StringProperty, ObjectProperty
 from kivy.uix.dropdown import DropDown
@@ -85,10 +86,12 @@ class HorizontalMenuLayout(MDRelativeLayout):
         self.right_dopdown_menu()
 
     def right_dopdown_menu(self, updating=False):
-        self.dropdown_menu = DropDown()
         if updating:
             # Remove an item from the list
             self.dropdown_menu.clear_widgets()
+        else:
+            self.dropdown_menu = DropDown(size_hint = (1, 0.5))
+            self.dropdown_menu.size_hint_min_y = 1
 
         with open('resources/logs/saved_states.json', 'r') as f:
             saved_states = json.load(f)
@@ -172,7 +175,7 @@ class LoadingModal(ModalView):
         self.loading_image = Image(source=loading_image_name)
 
         # Progress percent...
-        self.loadin_text_label = Label(text="Optimizing...",
+        self.loadin_text_label = Label(text="Loading...",
                                        color=(0, 0, 0, 1),
                                        size_hint=(.4, 1),
                                        pos_hint={'center_x': 0.5, 'center_y': 0.5},
@@ -278,7 +281,7 @@ class SimulationBoxLayout(MDBoxLayout):
         self.all_rectangles_list = []
         self.list_surrounding_cells = []
         self.generation_default = "GEN:"
-        self.generation = self.generation_default+" 0"
+        self.generation = self.generation_default + " 0"
         self.generation_number = 0
         self.in_simulation = False
         self.run_interval_seconds = run_interval_seconds
@@ -289,7 +292,7 @@ class SimulationBoxLayout(MDBoxLayout):
         self.delete_state_modal = DeleteStateModal(size_hint=(0.5, 0.04))
         self.delete_state_modal_yes_button = self.delete_state_modal.yes_delete
         self.delete_state_modal_cancel_button = self.delete_state_modal.cancel
-        self.loading_modal = LoadingModal(size_hint=(0.1, 0.2), auto_dismiss=False)
+        self.loading_modal = LoadingModal(size_hint=(0.2, 0.2), auto_dismiss=False)
         self.initial_state = None
         self.is_stability_reached = False
 
@@ -306,10 +309,10 @@ class SimulationBoxLayout(MDBoxLayout):
         self.toast_position = (save_button.pos[0], save_button.pos[1] - .02)
 
         self.size = self.parent.size
+
         # Generate grid
         self.generate_grid()
 
-        #
         self.bind_dorpdown_items_to_action()
 
     def init_vertical_line(self, x0: float, y1: float, y0=0):
@@ -461,32 +464,53 @@ class SimulationBoxLayout(MDBoxLayout):
             self.display_state_on_grid(obj_list=self.initial_state)
             show_toast(message="Last initial state reloaded", bg_col=[0, 0, 0, .5])
 
+    def _track_grid_initialization_progress_in_loading_modal(self, value, task_title, in_modal=True):
+        # tracking progress...
+        _percent = round(100 * value / self.nb_total_cells, 0)
+        _percent_text = str(_percent) + "%"
+        sys.stdout.write("\rProgress: {}".format(_percent_text))
+        sys.stdout.flush()
+        if in_modal:
+            self.loading_modal.loadin_text_label.text = task_title
+            self.loading_modal.progress_percent_label.text = _percent_text
+        # ----------
+
     def generate_grid(self):
+        task_title = "Generating grid..."
+        print(task_title)
         w, h = self.size
         self.rect_height_size = h / self.nb_rows
         self.rect_width_size = w / self.nb_cols
 
+        k = 1
         y = 0
         for i in range(self.nb_rows):  # rows: y
             x = 0
             for j in range(self.nb_cols):  # cols: x
+                # tracking progress...
+                self._track_grid_initialization_progress_in_loading_modal(value=k, task_title=task_title, in_modal=False)
+                k += 1
+                # ----------
+
                 self.init_rectangle(x=x, y=y, w=self.rect_width_size, h=self.rect_height_size)
                 x += self.rect_width_size
             y += self.rect_height_size
 
+        print("")
+
         # After generating the list of rectangles, make a copy of it. This copy should never be changed
-        self.all_rectangles_list = self.cells_in_grid.copy()
+        # self.all_rectangles_list = self.cells_in_grid.copy()
         self.draw_horizontal_and_vertical_lines()  # Drawing horizontal and vertical lines as borders
 
     def load_cells_in_np_2d_array(self):
-        print("Optimizing...")
+        task_title = "Optimizing..."
+        print(task_title)
         k = 1
         for cell in self.children:
-            _percent = round(100 * k / self.nb_total_cells, 0)
-            _percent_text = str(_percent) + "%"
-            self.loading_modal.progress_percent_label.text = _percent_text
-            sys.stdout.write("\rProgress: {}".format(_percent_text))
-            sys.stdout.flush()
+            # tracking progress...
+            self._track_grid_initialization_progress_in_loading_modal(value=k, task_title=task_title)
+            k += 1
+            # ----------
 
             x, y = cell.rect.pos
             w, h = self.rect_width_size, self.rect_height_size
@@ -495,9 +519,15 @@ class SimulationBoxLayout(MDBoxLayout):
                 np.append(self.np_array_all_xmin_ymin_xmax_ymax, [[xmin, ymin, xmax, ymax]], axis=0)
             self.cells_xmin_ymin_xmax_ymax_dict[(xmin, ymin, xmax, ymax)] = cell
 
-            k += 1
         print("")
         self.loading_modal.dismiss()
+
+    # def setup_grid(self, *args):
+    #     self.loading_modal.loadin_text_label.text = "task_title"
+    #
+    #     self.generate_grid()
+    #     self.load_cells_in_np_2d_array()
+    #     # self.loading_modal.dismiss()
 
     def is_intersect(self, bbox1, bbox2):
         return (bbox1[0] <= bbox2[2]) & (bbox1[2] >= bbox2[0]) & (bbox1[1] <= bbox2[3]) & (bbox1[3] >= bbox2[1])
@@ -675,18 +705,18 @@ class SimulationBoxLayout(MDBoxLayout):
     def custom_collide_point(self, x, y) -> bool:
         return self.get_cell_by_coords_from_all_cells(x=x, y=y) is not None
 
-    def func1(self):
-        self.active_cells_list = set()
-        for c in self.accessing_list:
-            if c.change_state_next:
-                if not c.is_active:  # if cell were not active then it will be activated, so add its position...
-                    self.activate_cell(cell=c)
-                else:
-                    self.deactivate_cell(cell=c)
-                c.change_state_next = False
-            else:  # For cells that are not changing their state. Check if they are active
-                if c.is_active:  # If there are active then add their position as they'll also be active next
-                    self.active_cells_list.add(c)
+    # def func1(self):
+    #     self.active_cells_list = set()
+    #     for c in self.accessing_list:
+    #         if c.change_state_next:
+    #             if not c.is_active:  # if cell were not active then it will be activated, so add its position...
+    #                 self.activate_cell(cell=c)
+    #             else:
+    #                 self.deactivate_cell(cell=c)
+    #             c.change_state_next = False
+    #         else:  # For cells that are not changing their state. Check if they are active
+    #             if c.is_active:  # If there are active then add their position as they'll also be active next
+    #                 self.active_cells_list.add(c)
 
     def update_grid(self, *args):
         """
@@ -726,4 +756,4 @@ class SimulationBoxLayout(MDBoxLayout):
 
         # Reset generation counter
         self.generation_number = 0
-        self.generation = self.generation_default+" 0"
+        self.generation = self.generation_default + " 0"

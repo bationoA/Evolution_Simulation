@@ -35,9 +35,9 @@ class EvolutionSimulationApp(MDApp):
         self.button_delete.bind(on_release=self.on_delete_state_icon_clicked)
         self.button_save.bind(on_release=self.on_save_icon_clicked)
 
-        Clock.schedule_once(self.simulation.loading_modal.open, 2)
-        delay = 2  # seconds
-        start_time = threading.Timer(delay, self.simulation.load_cells_in_np_2d_array)
+        delay = .1  # seconds
+        Clock.schedule_once(self.simulation.loading_modal.open, delay)
+        start_time = threading.Timer(delay+1, self.simulation.load_cells_in_np_2d_array)
         start_time.start()
 
     def update_start_button(self):
@@ -54,7 +54,7 @@ class EvolutionSimulationApp(MDApp):
             self.simulation.initial_state = self.simulation.active_cells_list.copy()
             self.update_start_button()
             # Schedule the update_grid method to be called every run_interval_seconds second
-            Clock.schedule_interval(self.simulation.update_grid, 1)
+            Clock.schedule_interval(self.simulation.update_grid, run_interval_seconds)
         else:
             self.in_simulation = False
             print('Pausing simulation...')
