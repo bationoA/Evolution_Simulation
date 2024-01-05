@@ -90,7 +90,7 @@ class HorizontalMenuLayout(MDRelativeLayout):
             # Remove an item from the list
             self.dropdown_menu.clear_widgets()
         else:
-            self.dropdown_menu = DropDown(size_hint = (1, 0.5))
+            self.dropdown_menu = DropDown(size_hint=(1, 0.5))
             self.dropdown_menu.size_hint_min_y = 1
 
         with open('resources/logs/saved_states.json', 'r') as f:
@@ -389,13 +389,15 @@ class SimulationBoxLayout(MDBoxLayout):
         if reset_first:
             # Reset the grid
             self.reset_grid()
-        if isinstance(list(obj_list)[0], CellWidget):
-            obj_list = [c.rect.pos for c in list(obj_list)]
 
-        # get and activate the cells related to the state
-        for pos in obj_list:
-            cell = self.get_cell_by_coords_from_all_cells(*pos)
-            self.activate_cell(cell=cell)
+        if len(obj_list):
+            if isinstance(list(obj_list)[0], CellWidget):
+                obj_list = [c.rect.pos for c in list(obj_list)]
+
+            # get and activate the cells related to the state
+            for pos in obj_list:
+                cell = self.get_cell_by_coords_from_all_cells(*pos)
+                self.activate_cell(cell=cell)
 
     def save_sate(self, *args):
         show_toast(message="Saving...", bg_col=[0, 0, 0, .5])
@@ -488,7 +490,8 @@ class SimulationBoxLayout(MDBoxLayout):
             x = 0
             for j in range(self.nb_cols):  # cols: x
                 # tracking progress...
-                self._track_grid_initialization_progress_in_loading_modal(value=k, task_title=task_title, in_modal=False)
+                self._track_grid_initialization_progress_in_loading_modal(value=k, task_title=task_title,
+                                                                          in_modal=False)
                 k += 1
                 # ----------
 

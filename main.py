@@ -2,7 +2,9 @@ import threading
 
 from kivy.clock import Clock
 from kivymd.app import MDApp
-from functions import *
+
+from config import pause_button_logo_name, start_button_logo_name, run_interval_seconds
+from functions import GridZoneLayout, show_toast
 
 
 class EvolutionSimulationApp(MDApp):
